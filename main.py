@@ -78,9 +78,12 @@ EXPERT_DISCLAIMER = (
 
 # ── Load SavedModel ───────────────────────────────────────────────────────────
 MODEL_PATH = "models/plant_leaf_disease_detector"
-model = tf.saved_model.load(MODEL_PATH)
+model = tf.keras.models.load_model(
+    MODEL_PATH,
+    compile=False  # skips loading optimizer — fixes add_slot error
+)
 infer = model.signatures["serving_default"]
-print("✅ Model loaded successfully!")
+print("✅ Model loaded successfully!")r
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def preprocess(image_bytes: bytes) -> tf.Tensor:
@@ -139,8 +142,7 @@ async def predict(file: UploadFile = File(...)):
     input_tensor = preprocess(image_bytes)
 
     # Run inference
-    output = infer(input_tensor)
-    predictions = list(output.values())[0].numpy()[0]
+    predictions = model.predict(input_tensor)[0]
 
     top_indices = predictions.argsort()[-3:][::-1]
 
