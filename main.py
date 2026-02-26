@@ -76,22 +76,18 @@ EXPERT_DISCLAIMER = (
     "before taking any action on your crops."
 )
 
-# ── Load SavedModel ───────────────────────────────────────────────────────────
+# ── Load Model ────────────────────────────────────────────────────────────────
+# compile=False skips loading optimizer state — fixes the add_slot error
 MODEL_PATH = "models/plant_leaf_disease_detector"
-model = tf.keras.models.load_model(
-    MODEL_PATH,
-    compile=False  # skips loading optimizer — fixes add_slot error
-)
-infer = model.signatures["serving_default"]
-print("✅ Model loaded successfully!")r
+model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+print("✅ Model loaded successfully!")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def preprocess(image_bytes: bytes) -> tf.Tensor:
+def preprocess(image_bytes: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img = img.resize((256, 256))
     img_array = np.array(img) / 255.0
-    img_array = np.expand_dims(img_array, 0).astype(np.float32)
-    return tf.constant(img_array)
+    return np.expand_dims(img_array, 0).astype(np.float32)
 
 
 def format_result(label: str, confidence: float) -> dict:
@@ -139,10 +135,9 @@ async def predict(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only JPG/PNG images are supported")
 
     image_bytes = await file.read()
-    input_tensor = preprocess(image_bytes)
+    img_array = preprocess(image_bytes)
 
-    # Run inference
-    predictions = model.predict(input_tensor)[0]
+    predictions = model.predict(img_array)[0]
 
     top_indices = predictions.argsort()[-3:][::-1]
 
